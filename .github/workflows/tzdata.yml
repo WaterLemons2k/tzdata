@@ -1,0 +1,47 @@
+name: tzdata
+
+on:
+  push:
+
+  schedule:
+    - cron: '0 0 * * 0'
+  
+jobs:
+  cache:
+    runs-on: ubuntu-latest
+    outputs:
+      cache-hit: ${{ steps.cache.outputs.cache-hit }}
+      VERSION: ${{ env.VERSION }}
+    steps:
+      - name: Get tzdata VERSION
+        run: |
+          echo "VERSION=$(sudo apt-get install tzdata | grep '[(-]' | awk -F '[(-]' '{print $2}')" >> $GITHUB_ENV
+          touch ~/.cache
+
+      - name: Cache
+        id: cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache
+          key: ${{ env.VERSION }}
+          
+  tzdata:
+    runs-on: ubuntu-latest
+    needs: cache
+    if: needs.cache.outputs.cache-hit != 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Add tzdata
+        run: |
+          cp -r /usr/share/zoneinfo/* .
+          sed -i "3c Version: ${{ needs.cache.outputs.VERSION }}" README.md
+
+      - name: Git
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "feat: bump tzdata to ${{ needs.cache.outputs.VERSION }}"
+          commit_author: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
+          tagging_message: ${{ needs.cache.outputs.VERSION }}
+          
